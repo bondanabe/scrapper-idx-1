@@ -1,0 +1,20 @@
+{
+  "name": "scrapper-idx-1",
+  "version": "1.0.0",
+  "description": "IDX stock OHLCV scraper using Puppeteer CSS selectors and Supabase",
+  "type": "module",
+  "bin": {
+    "scrapper-idx": "./src/index.js"
+  },
+  "scripts": {
+    "scrape": "node src/index.js scrape",
+    "probe": "node src/index.js probe",
+    "test-selectors": "node src/index.js test-selectors"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "commander": "^13.1.0",
+    "dotenv": "^16.4.7",
+    "puppeteer": "^24.2.0"
+  }
+}

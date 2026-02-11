@@ -1,0 +1,62 @@
+{
+  "baseUrl": "https://stockbit.com/symbol/{symbol}",
+  "pageVariant": "",
+  "strategy": "panel",
+  "dateFormat": "DD/MM/YYYY",
+  "dateMode": "today",
+  "numberLocale": "id-ID",
+
+  "preActions": [
+    {
+      "action": "wait",
+      "ms": 3000,
+      "description": "Wait for page to fully load"
+    },
+    {
+      "action": "assertLoggedIn",
+      "optional": true,
+      "description": "Verify login state before extraction"
+    }
+  ],
+
+  "panel": {
+    "selectorMode": "label",
+    "container": "",
+    "fields": {
+      "close":  { "label": "Close",  "valuePosition": "heading" },
+      "open":   { "label": "Open",   "valuePosition": "sibling" },
+      "high":   { "label": "High",   "valuePosition": "sibling" },
+      "low":    { "label": "Low",    "valuePosition": "sibling" },
+      "volume": { "label": "Volume", "valuePosition": "sibling" }
+    }
+  },
+
+  "table": {
+    "container": "REPLACE_WITH_TABLE_SELECTOR",
+    "rowSelector": "tbody tr",
+    "columns": {
+      "date":   { "index": 0, "attribute": "textContent" },
+      "open":   { "index": 1, "attribute": "textContent" },
+      "high":   { "index": 2, "attribute": "textContent" },
+      "low":    { "index": 3, "attribute": "textContent" },
+      "close":  { "index": 4, "attribute": "textContent" },
+      "volume": { "index": 5, "attribute": "textContent" }
+    }
+  },
+
+  "tooltip": {
+    "chartCanvas": "REPLACE_WITH_CANVAS_SELECTOR",
+    "tooltipContainer": "REPLACE_WITH_TOOLTIP_SELECTOR",
+    "fields": {
+      "date":   { "selector": "REPLACE_WITH_YOUR_SELECTOR", "attribute": "textContent" },
+      "open":   { "selector": "REPLACE_WITH_YOUR_SELECTOR", "attribute": "textContent" },
+      "high":   { "selector": "REPLACE_WITH_YOUR_SELECTOR", "attribute": "textContent" },
+      "low":    { "selector": "REPLACE_WITH_YOUR_SELECTOR", "attribute": "textContent" },
+      "close":  { "selector": "REPLACE_WITH_YOUR_SELECTOR", "attribute": "textContent" },
+      "volume": { "selector": "REPLACE_WITH_YOUR_SELECTOR", "attribute": "textContent" }
+    },
+    "scanStep": 5,
+    "scanStart": 50,
+    "scanEnd": 950
+  }
+}

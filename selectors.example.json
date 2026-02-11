@@ -1,0 +1,80 @@
+{
+  "baseUrl": "https://stockbit.com/symbol/{symbol}",
+  "pageVariant": "",
+  "strategy": "panel",
+  "dateFormat": "DD/MM/YYYY",
+  "dateMode": "today",
+  "numberLocale": "id-ID",
+
+  "_comment_preActions": "PreActions run before extraction. Use 'assertLoggedIn' to verify auth state.",
+  "preActions": [
+    {
+      "action": "wait",
+      "ms": 3000,
+      "description": "Wait for page to fully load"
+    },
+    {
+      "action": "assertLoggedIn",
+      "optional": true,
+      "description": "Verify user is logged in (OHLCV requires authentication)"
+    }
+  ],
+
+  "_comment_panel": "selectorMode: 'label' finds values by text labels (resilient to CSS class changes). 'css' uses direct CSS selectors (fragile with Styled Components).",
+  "panel": {
+    "selectorMode": "label",
+    "container": "",
+    "fields": {
+      "close":  { "label": "Close",  "valuePosition": "heading", "_comment": "Current price — large heading number" },
+      "open":   { "label": "Open",   "valuePosition": "sibling", "_comment": "Finds 'Open' label, reads adjacent value" },
+      "high":   { "label": "High",   "valuePosition": "sibling" },
+      "low":    { "label": "Low",    "valuePosition": "sibling" },
+      "volume": { "label": "Volume", "valuePosition": "sibling" }
+    }
+  },
+
+  "_comment_panel_css": "Alternative: CSS-based panel config (fragile — class names change on deploys)",
+  "panel_css_example": {
+    "selectorMode": "css",
+    "container": "",
+    "fields": {
+      "close":  { "selector": "h3.price-heading", "attribute": "textContent" },
+      "open":   { "selector": "div.open-value",   "attribute": "textContent" },
+      "high":   { "selector": "div.high-value",   "attribute": "textContent" },
+      "low":    { "selector": "div.low-value",     "attribute": "textContent" },
+      "volume": { "selector": "h3.volume-value",  "attribute": "textContent" }
+    }
+  },
+
+  "table": {
+    "container": "table.price-history",
+    "rowSelector": "tbody tr",
+    "columns": {
+      "date":   { "index": 0, "attribute": "textContent" },
+      "open":   { "index": 1, "attribute": "textContent" },
+      "high":   { "index": 2, "attribute": "textContent" },
+      "low":    { "index": 3, "attribute": "textContent" },
+      "close":  { "index": 4, "attribute": "textContent" },
+      "volume": { "index": 5, "attribute": "textContent" }
+    }
+  },
+
+  "tooltip": {
+    "chartCanvas": "canvas.chart-canvas",
+    "tooltipContainer": "div.chart-tooltip",
+    "fields": {
+      "date":   { "selector": "span.tt-date",   "attribute": "textContent" },
+      "open":   { "selector": "span.tt-open",   "attribute": "textContent" },
+      "high":   { "selector": "span.tt-high",   "attribute": "textContent" },
+      "low":    { "selector": "span.tt-low",    "attribute": "textContent" },
+      "close":  { "selector": "span.tt-close",  "attribute": "textContent" },
+      "volume": { "selector": "span.tt-volume", "attribute": "textContent" }
+    },
+    "scanStep": 5,
+    "scanStart": 50,
+    "scanEnd": 950
+  },
+
+  "_comment_auth": "Authentication: Set STOCKBIT_EMAIL and STOCKBIT_PASSWORD in .env. Login is automatic. Use --no-login to skip.",
+  "_comment_valuePositions": "valuePosition options: 'sibling' (next element), 'parent' (parent minus label), 'child' (child of parent), 'heading' (first numeric h1-h3), 'adjacent' (next sibling in same parent)"
+}
