@@ -71,11 +71,11 @@ program
           }
 
           if (options.dryRun) {
-            const transformed = rows.map(r => transformRow(r, config.dateFormat, config.dateMode));
+            const transformed = rows.map(r => transformRow(r, config.dateFormat, config.dateMode, config.numberLocale));
             logger.info(`${symbol}: ${transformed.length} rows (dry run)`);
             console.log(JSON.stringify(transformed, null, 2));
           } else {
-            const { inserted, errors } = await upsertRows(rows, config.dateFormat, config.dateMode);
+            const { inserted, errors } = await upsertRows(rows, config.dateFormat, config.dateMode, config.numberLocale);
             totalInserted += inserted;
             logger.info(`${symbol}: ${inserted} rows saved`);
             if (errors.length > 0) {
@@ -188,7 +188,7 @@ program
       if (rows.length === 0) {
         logger.warn('No data extracted. Check your CSS selectors in selectors.json.');
       } else {
-        const transformed = rows.map(r => transformRow(r, config.dateFormat, config.dateMode));
+        const transformed = rows.map(r => transformRow(r, config.dateFormat, config.dateMode, config.numberLocale));
         logger.info(`Extracted ${transformed.length} rows:`);
         console.log(JSON.stringify(transformed, null, 2));
       }

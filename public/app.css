@@ -1,0 +1,295 @@
+:root {
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --border: #e1e5eb;
+  --text: #1a1a2e;
+  --text-muted: #6b7280;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --success: #16a34a;
+  --danger: #dc2626;
+  --warning: #d97706;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+header h1 {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.auth-badge {
+  font-size: 13px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+.auth-badge.ok { background: #dcfce7; color: var(--success); }
+.auth-badge.expired { background: #fef2f2; color: var(--danger); }
+.auth-badge.loading { background: #f3f4f6; color: var(--text-muted); }
+
+/* ── Tabs ────────────────────────────────────────────────── */
+
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  margin-top: 8px;
+}
+
+.tab {
+  padding: 10px 20px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+.tab-content { display: none; padding: 20px 0; }
+.tab-content.active { display: block; }
+
+/* ── Toolbar ─────────────────────────────────────────────── */
+
+.toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.toolbar input[type="text"],
+.toolbar input[type="date"],
+.toolbar select {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--surface);
+}
+
+.toolbar input[type="text"] { flex: 1; min-width: 200px; }
+
+/* ── Buttons ─────────────────────────────────────────────── */
+
+.btn {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.btn:hover { background: #f3f4f6; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn.primary {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.btn.primary:hover { background: var(--primary-hover); }
+.btn.primary:disabled { background: var(--primary); opacity: 0.5; }
+
+/* ── Select bar ──────────────────────────────────────────── */
+
+.select-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+  font-size: 13px;
+}
+
+.select-bar label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+#selected-count { color: var(--text-muted); }
+
+/* ── Tables ──────────────────────────────────────────────── */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 14px;
+}
+
+#companies-table { border-top: none; border-radius: 0 0 6px 6px; }
+
+thead th {
+  text-align: left;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+thead th:first-child { width: 40px; text-align: center; }
+
+tbody td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+tbody td:first-child { text-align: center; }
+
+tbody tr:hover { background: #f9fafb; }
+
+tbody tr:last-child td { border-bottom: none; }
+
+.ticker-cell { font-weight: 600; font-family: var(--mono); }
+
+/* Prices table */
+#prices-table th:not(:first-child),
+#prices-table td:not(:first-child) { text-align: right; }
+#prices-table { border-radius: 6px; }
+
+/* ── Pagination ──────────────────────────────────────────── */
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px;
+}
+
+.pagination button {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.pagination button:hover { background: #f3f4f6; }
+.pagination button.active { background: var(--primary); color: white; border-color: var(--primary); }
+.pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Actions ─────────────────────────────────────────────── */
+
+.actions {
+  display: flex;
+  gap: 10px;
+  padding: 16px 0;
+}
+
+/* ── Scrape tab ──────────────────────────────────────────── */
+
+.scrape-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 6px 0 16px;
+}
+
+.log-container {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #1a1a2e;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.log {
+  padding: 12px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: #e2e8f0;
+}
+
+.log-entry { padding: 2px 0; }
+.log-entry.error { color: #fca5a5; }
+.log-entry.success { color: #86efac; }
+.log-entry .timestamp { color: #64748b; }
+
+/* ── Data viewer ─────────────────────────────────────────── */
+
+.prices-info {
+  text-align: center;
+  padding: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+#btn-load-more {
+  display: block;
+  margin: 0 auto 20px;
+}
+
+/* ── Empty state ─────────────────────────────────────────── */
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  font-size: 14px;
+}

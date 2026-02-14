@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IDX Scraper Dashboard</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+  <header>
+    <h1>IDX Scraper Dashboard</h1>
+    <div id="auth-status" class="auth-badge loading">Checking cookies...</div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="companies">Companies</button>
+    <button class="tab" data-tab="scrape">Scrape</button>
+    <button class="tab" data-tab="viewer">Data Viewer</button>
+  </nav>
+
+  <!-- ── Tab 1: Companies ────────────────────────────────────── -->
+  <section id="tab-companies" class="tab-content active">
+    <div class="toolbar">
+      <input type="text" id="search-input" placeholder="Search ticker or name..." />
+      <select id="sector-filter">
+        <option value="">All Sectors</option>
+      </select>
+    </div>
+
+    <div class="select-bar">
+      <label><input type="checkbox" id="select-all" /> Select All (this page)</label>
+      <span id="selected-count">0 selected</span>
+    </div>
+
+    <table id="companies-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Ticker</th>
+          <th>Name</th>
+          <th>Sector</th>
+          <th>Subsector</th>
+        </tr>
+      </thead>
+      <tbody id="companies-body"></tbody>
+    </table>
+
+    <div class="pagination" id="pagination"></div>
+
+    <div class="actions">
+      <button id="btn-scrape-selected" class="btn primary" disabled>Scrape Selected (0)</button>
+      <button id="btn-scrape-all" class="btn">Scrape All</button>
+    </div>
+  </section>
+
+  <!-- ── Tab 2: Scrape ───────────────────────────────────────── -->
+  <section id="tab-scrape" class="tab-content">
+    <div class="scrape-header">
+      <span>Status: <strong id="scrape-state">Idle</strong></span>
+      <span id="scrape-summary"></span>
+    </div>
+
+    <div class="progress-bar-container">
+      <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
+    </div>
+    <div id="progress-text" class="progress-text">0 / 0</div>
+
+    <div class="log-container">
+      <div id="scrape-log" class="log"></div>
+    </div>
+  </section>
+
+  <!-- ── Tab 3: Data Viewer ──────────────────────────────────── -->
+  <section id="tab-viewer" class="tab-content">
+    <div class="toolbar">
+      <select id="viewer-symbol">
+        <option value="">Select Symbol</option>
+      </select>
+      <input type="date" id="viewer-from" />
+      <input type="date" id="viewer-to" />
+      <button id="btn-load-data" class="btn primary">Load Data</button>
+    </div>
+
+    <table id="prices-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Open</th>
+          <th>High</th>
+          <th>Low</th>
+          <th>Close</th>
+          <th>Volume</th>
+        </tr>
+      </thead>
+      <tbody id="prices-body"></tbody>
+    </table>
+
+    <div id="prices-info" class="prices-info"></div>
+    <button id="btn-load-more" class="btn" style="display:none">Load More</button>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>

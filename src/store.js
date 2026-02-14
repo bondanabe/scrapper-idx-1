@@ -33,16 +33,16 @@ function todayISO() {
  * Transform a raw extracted row (string values) into DB-ready typed values.
  * If dateMode is "today", uses current date instead of parsing from DOM.
  */
-export function transformRow(raw, dateFormat, dateMode) {
+export function transformRow(raw, dateFormat, dateMode, numberLocale) {
   const date = dateMode === 'today' ? todayISO() : parseDate(raw.date, dateFormat);
   return {
     symbol: String(raw.symbol).toUpperCase().trim(),
     date,
-    open: parseNumber(raw.open),
-    high: parseNumber(raw.high),
-    low: parseNumber(raw.low),
-    close: parseNumber(raw.close),
-    volume: Math.round(parseNumber(raw.volume) || 0),
+    open: parseNumber(raw.open, numberLocale),
+    high: parseNumber(raw.high, numberLocale),
+    low: parseNumber(raw.low, numberLocale),
+    close: parseNumber(raw.close, numberLocale),
+    volume: Math.round(parseNumber(raw.volume, numberLocale) || 0),
   };
 }
 
@@ -50,11 +50,11 @@ export function transformRow(raw, dateFormat, dateMode) {
  * Upsert rows to Supabase daily_prices table.
  * Uses onConflict on (symbol, date) composite unique constraint.
  */
-export async function upsertRows(rows, dateFormat, dateMode) {
+export async function upsertRows(rows, dateFormat, dateMode, numberLocale) {
   const supabase = getClient();
 
   const transformed = rows
-    .map(r => transformRow(r, dateFormat, dateMode))
+    .map(r => transformRow(r, dateFormat, dateMode, numberLocale))
     .filter(r => r.date && r.symbol);
 
   if (transformed.length === 0) {

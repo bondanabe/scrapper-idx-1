@@ -37,7 +37,12 @@ export async function tryLoadCookies(page) {
  */
 export async function saveCookies(page) {
   try {
-    const cookies = await page.cookies();
+    // Get cookies for all Stockbit domains (not just current page URL)
+    const cookies = await page.cookies(
+      'https://stockbit.com',
+      'https://www.stockbit.com',
+      'https://api.stockbit.com',
+    );
     await writeFile(COOKIES_PATH, JSON.stringify(cookies, null, 2), 'utf-8');
     logger.debug(`Saved ${cookies.length} cookies to ${COOKIES_PATH}`);
   } catch (err) {
@@ -55,6 +60,9 @@ export async function isLoggedIn(page, checkUrl) {
     const currentUrl = page.url();
     if (!currentUrl || currentUrl === 'about:blank') {
       const targetUrl = checkUrl || 'https://stockbit.com/symbol/BBCA';
+      await page.setUserAgent(
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      );
       await page.goto(targetUrl, {
         waitUntil: 'networkidle2',
         timeout: 60000,
@@ -64,9 +72,16 @@ export async function isLoggedIn(page, checkUrl) {
     // Wait a bit for dynamic content
     await new Promise(r => setTimeout(r, 2000));
 
-    // Check multiple indicators of being logged in
+    // Check 1 (most reliable): URL-based — if redirected to /login, definitely not logged in
+    const finalUrl = page.url();
+    if (finalUrl.includes('/login') || finalUrl.includes('/register') || finalUrl.includes('/signin')) {
+      logger.debug('Login check: redirected to login page → not logged in');
+      return false;
+    }
+
+    // Check 2: DOM-based — look for logged-in indicators
     const loggedIn = await page.evaluate(() => {
-      // Check 1: look for avatar/profile elements
+      // Positive signals: avatar, profile elements, or user menu
       const avatarSelectors = [
         '[class*="avatar"]', '[class*="Avatar"]',
         '[class*="UserMenu"]', '[class*="user-menu"]',
@@ -76,17 +91,22 @@ export async function isLoggedIn(page, checkUrl) {
         if (document.querySelector(sel)) return true;
       }
 
-      // Check 2: look for "Login" or "Register" buttons in nav — if present, NOT logged in
-      const navLinks = Array.from(document.querySelectorAll('header a, nav a, [class*="nav"] a, [class*="Nav"] a'));
-      const hasNavLogin = navLinks.some(el => {
+      // Negative signals: login/register buttons or forms anywhere on page
+      const allLinks = Array.from(document.querySelectorAll('a, button'));
+      const hasLoginButton = allLinks.some(el => {
         const text = (el.textContent || '').trim().toLowerCase();
-        return text === 'login' || text === 'register';
+        return text === 'login' || text === 'masuk' || text === 'register' || text === 'daftar';
       });
 
-      return !hasNavLogin;
+      // Check for login form
+      const hasLoginForm = document.querySelector('input[type="password"]') !== null;
+
+      if (hasLoginButton || hasLoginForm) return false;
+
+      return true;
     });
 
-    logger.debug(`Login check: ${loggedIn ? 'logged in' : 'not logged in'}`);
+    logger.debug(`Login check: ${loggedIn ? 'logged in' : 'not logged in'} (url: ${finalUrl})`);
     return loggedIn;
   } catch (err) {
     logger.warn(`Login check failed: ${err.message}`);

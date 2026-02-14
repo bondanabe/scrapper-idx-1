@@ -14,6 +14,7 @@ export async function launchBrowser(options = {}) {
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
+      '--disable-blink-features=AutomationControlled',
       '--window-size=1400,900',
     ],
     defaultViewport: { width: 1400, height: 900 },

@@ -125,6 +125,13 @@ async function extractByLabel(page, config) {
 
     for (const [field, def] of Object.entries(fieldsConfig)) {
       try {
+        // Direct CSS selector — bypass label search entirely
+        if (def.valuePosition === 'direct' && def.selector) {
+          const el = document.querySelector(def.selector);
+          out[field] = el ? extractValue(el) : null;
+          continue;
+        }
+
         // Special handling for "close" (current price) — usually the main heading
         if (def.valuePosition === 'heading') {
           const headings = document.querySelectorAll('h1, h2, h3');
@@ -156,10 +163,21 @@ async function extractByLabel(page, config) {
                 value = extractValue(sib);
                 if (value) break;
               }
-              // Fallback: parent's next sibling
+              // Try previous element sibling (value above label)
+              sib = labelEl.previousElementSibling;
+              if (sib) {
+                value = extractValue(sib);
+                if (value) break;
+              }
+              // Fallback: parent's siblings
               const parent = labelEl.parentElement;
               if (parent) {
                 sib = parent.nextElementSibling;
+                if (sib) {
+                  value = extractValue(sib);
+                  if (value) break;
+                }
+                sib = parent.previousElementSibling;
                 if (sib) {
                   value = extractValue(sib);
                   if (value) break;

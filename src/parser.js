@@ -9,7 +9,7 @@
  *   "0,5 K"      → 500
  *   "7675"        → 7675
  */
-export function parseNumber(raw) {
+export function parseNumber(raw, locale) {
   if (raw == null) return null;
   let s = String(raw).trim();
   if (!s) return null;
@@ -27,7 +27,20 @@ export function parseNumber(raw) {
 
   if (!s) return null;
 
-  // Determine format: if comma appears after last dot → Indonesian
+  // If locale is explicitly Indonesian (Stockbit format)
+  if (locale === 'id-ID') {
+    if (multiplier > 1) {
+      // With suffix (K/M/B/T): comma = thousands (remove), dot = decimal (keep)
+      s = s.replace(/,/g, '');
+    } else {
+      // Without suffix: both comma and dot = thousands (remove all)
+      s = s.replace(/[.,]/g, '');
+    }
+    const num = parseFloat(s);
+    return isNaN(num) ? null : num * multiplier;
+  }
+
+  // Auto-detect format (fallback when no locale specified)
   const lastDot = s.lastIndexOf('.');
   const lastComma = s.lastIndexOf(',');
 
