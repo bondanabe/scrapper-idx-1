@@ -40,6 +40,13 @@ export function parseNumber(raw, locale) {
     return isNaN(num) ? null : num * multiplier;
   }
 
+  // English format (TradingView): comma = thousands, dot = decimal
+  if (locale === 'en-US') {
+    s = s.replace(/,/g, '');
+    const num = parseFloat(s);
+    return isNaN(num) ? null : num * multiplier;
+  }
+
   // Auto-detect format (fallback when no locale specified)
   const lastDot = s.lastIndexOf('.');
   const lastComma = s.lastIndexOf(',');

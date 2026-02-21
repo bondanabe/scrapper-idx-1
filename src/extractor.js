@@ -1,11 +1,13 @@
 import { extractPanel } from './strategies/panel.js';
 import { extractTable } from './strategies/table.js';
 import { extractTooltip } from './strategies/tooltip.js';
+import { extractChartHeader } from './strategies/chart-header.js';
 
 const strategies = {
   panel: extractPanel,
   table: extractTable,
   tooltip: extractTooltip,
+  'chart-header': extractChartHeader,
 };
 
 /**

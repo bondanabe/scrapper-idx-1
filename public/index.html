@@ -49,6 +49,13 @@
     <div class="pagination" id="pagination"></div>
 
     <div class="actions">
+      <label>Source:
+        <select id="scrape-source">
+          <option value="stockbit">Stockbit</option>
+          <option value="tradingview">TradingView</option>
+        </select>
+      </label>
+      <label>Tanggal data: <input type="date" id="scrape-date" /></label>
       <button id="btn-scrape-selected" class="btn primary" disabled>Scrape Selected (0)</button>
       <button id="btn-scrape-all" class="btn">Scrape All</button>
     </div>

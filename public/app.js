@@ -38,6 +38,8 @@ const els = {
   selectedCount: $('#selected-count'),
   companiesBody: $('#companies-body'),
   pagination: $('#pagination'),
+  scrapeSource: $('#scrape-source'),
+  scrapeDate: $('#scrape-date'),
   btnScrapeSelected: $('#btn-scrape-selected'),
   btnScrapeAll: $('#btn-scrape-all'),
   scrapeState: $('#scrape-state'),
@@ -241,10 +243,12 @@ els.sectorFilter.addEventListener('change', () => {
 
 async function startScrape(symbols) {
   try {
+    const date = els.scrapeDate.value || undefined;
+    const source = els.scrapeSource.value || 'stockbit';
     const res = await fetch('/api/scrape', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbols }),
+      body: JSON.stringify({ symbols, date, source }),
     });
     const data = await res.json();
 
@@ -466,6 +470,9 @@ function formatVolume(n) {
 }
 
 // ── Init ─────────────────────────────────────────────────────────────
+
+// Set default scrape date to today
+els.scrapeDate.value = new Date().toISOString().slice(0, 10);
 
 checkAuth();
 fetchSectors();

@@ -4,8 +4,9 @@ import 'dotenv/config';
 
 let _selectors = null;
 
-export async function loadSelectors(path) {
-  const filepath = path || resolve(process.cwd(), 'selectors.json');
+export async function loadSelectors(source = 'stockbit') {
+  const filename = source === 'tradingview' ? 'selectors-tradingview.json' : 'selectors.json';
+  const filepath = resolve(process.cwd(), filename);
   const raw = await readFile(filepath, 'utf-8');
   const config = JSON.parse(raw);
   validateConfig(config);
@@ -36,11 +37,20 @@ export function getStockbitCredentials() {
   return { email, password };
 }
 
+export function getTradingViewCredentials() {
+  const email = process.env.TRADINGVIEW_EMAIL;
+  const password = process.env.TRADINGVIEW_PASSWORD;
+  if (!email || !password) {
+    throw new Error('Missing TRADINGVIEW_EMAIL or TRADINGVIEW_PASSWORD in .env file.');
+  }
+  return { email, password };
+}
+
 function validateConfig(config) {
   if (!config.baseUrl) throw new Error('selectors.json: missing "baseUrl"');
   if (!config.strategy) throw new Error('selectors.json: missing "strategy"');
 
-  const validStrategies = ['panel', 'table', 'tooltip'];
+  const validStrategies = ['panel', 'table', 'tooltip', 'chart-header'];
   if (!validStrategies.includes(config.strategy)) {
     throw new Error(`selectors.json: invalid strategy "${config.strategy}". Must be one of: ${validStrategies.join(', ')}`);
   }

@@ -1,0 +1,21 @@
+{
+  "baseUrl": "https://www.tradingview.com/chart/",
+  "strategy": "chart-header",
+  "dateFormat": "YYYY-MM-DD",
+  "dateMode": "today",
+  "numberLocale": "en-US",
+  "requiresAuth": true,
+
+  "preActions": [
+    {
+      "action": "wait",
+      "ms": 3000,
+      "description": "Wait for chart to fully load"
+    }
+  ],
+
+  "chart-header": {
+    "waitAfterSymbolChange": 3000,
+    "timeframe": "1D"
+  }
+}

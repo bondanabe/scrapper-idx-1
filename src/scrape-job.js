@@ -5,6 +5,8 @@ import { ensureLoggedIn } from './auth.js';
 import { getStockbitCredentials } from './config.js';
 import { extractData } from './extractor.js';
 import { upsertRows } from './store.js';
+import { ensureDaily, changeSymbolTV, ensureLoggedInTV } from './tradingview.js';
+import { getTradingViewCredentials } from './config.js';
 import { logger } from './logger.js';
 
 export class ScrapeJob extends EventEmitter {
@@ -37,11 +39,13 @@ export class ScrapeJob extends EventEmitter {
     };
   }
 
-  async start(symbols) {
+  async start(symbols, customDate, source = 'stockbit') {
     if (this.isRunning()) throw new Error('Job already running');
 
     this.state = 'running';
     this.symbols = symbols;
+    this.customDate = customDate || null;
+    this.source = source;
     this.completed = 0;
     this.total = symbols.length;
     this.currentSymbol = null;
@@ -61,31 +65,55 @@ export class ScrapeJob extends EventEmitter {
   async _run() {
     let browser;
     try {
-      const config = await loadSelectors();
+      const config = await loadSelectors(this.source);
       browser = await launchBrowser({ headed: true });
       const page = await browser.newPage();
 
-      // Authenticate: try cookies first, fallback to login form + OTP
-      const firstSymbolUrl = config.baseUrl.replace('{symbol}', this.symbols[0])
-        + (config.pageVariant ? `/${config.pageVariant}` : '');
-      const credentials = getStockbitCredentials();
-
       this.emit('status', {
         state: 'running',
-        message: 'Authenticating...',
+        message: `Initializing (${this.source})...`,
         completed: 0,
         total: this.total,
       });
 
-      await ensureLoggedIn(page, credentials, firstSymbolUrl);
+      // ── Source-specific initialization ──
+      if (this.source === 'tradingview') {
+        // TradingView: authenticate + navigate to chart
+        const tvCredentials = getTradingViewCredentials();
+
+        this.emit('status', {
+          state: 'running',
+          message: 'Authenticating to TradingView...',
+          completed: 0,
+          total: this.total,
+        });
+
+        await ensureLoggedInTV(page, tvCredentials, config.baseUrl);
+        await ensureDaily(page);
+      } else {
+        // Stockbit: authenticate via cookies + login form
+        const firstSymbolUrl = config.baseUrl.replace('{symbol}', this.symbols[0])
+          + (config.pageVariant ? `/${config.pageVariant}` : '');
+        const credentials = getStockbitCredentials();
+
+        this.emit('status', {
+          state: 'running',
+          message: 'Authenticating...',
+          completed: 0,
+          total: this.total,
+        });
+
+        await ensureLoggedIn(page, credentials, firstSymbolUrl);
+      }
 
       this.emit('status', {
         state: 'running',
-        message: 'Authenticated, starting scrape...',
+        message: 'Ready, starting scrape...',
         completed: 0,
         total: this.total,
       });
 
+      // ── Symbol loop ──
       for (let i = 0; i < this.symbols.length; i++) {
         const symbol = this.symbols[i];
         this.currentSymbol = symbol;
@@ -99,12 +127,16 @@ export class ScrapeJob extends EventEmitter {
         });
 
         try {
-          if (page.url().includes(`/symbol/${symbol.toUpperCase()}`)) {
+          // ── Navigate to symbol ──
+          if (this.source === 'tradingview') {
+            await changeSymbolTV(page, symbol, config['chart-header'] || {});
+          } else if (page.url().includes(`/symbol/${symbol.toUpperCase()}`)) {
             await executePreActions(page, config.preActions || []);
           } else {
             await navigateToSymbol(page, config, symbol);
           }
 
+          // ── Extract data ──
           const rows = await extractData(page, config, symbol);
           if (rows.length === 0) {
             this.failed.push(symbol);
@@ -113,7 +145,7 @@ export class ScrapeJob extends EventEmitter {
               completed: this.completed + 1, total: this.total,
             });
           } else {
-            const { inserted, errors } = await upsertRows(rows, config.dateFormat, config.dateMode, config.numberLocale);
+            const { inserted, errors } = await upsertRows(rows, config.dateFormat, config.dateMode, config.numberLocale, this.customDate);
             this.totalInserted += inserted;
             this.emit('symbol-done', {
               symbol, rows: inserted,

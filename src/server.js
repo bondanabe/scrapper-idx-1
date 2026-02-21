@@ -141,7 +141,13 @@ app.post('/api/scrape', async (req, res) => {
     // Normalize symbols
     symbols = symbols.map(s => String(s).trim().toUpperCase()).filter(Boolean);
 
-    await scrapeJob.start(symbols);
+    // Optional custom date (YYYY-MM-DD)
+    const date = req.body.date || undefined;
+
+    // Data source: 'stockbit' (default) or 'tradingview'
+    const source = req.body.source || 'stockbit';
+
+    await scrapeJob.start(symbols, date, source);
 
     res.status(202).json({
       status: 'started',
