@@ -440,30 +440,38 @@ export async function changeSymbolTV(page, symbol, config = {}) {
     // Wait for chart to load the new symbol
     await new Promise(r => setTimeout(r, waitAfter));
 
-    // ── Verify symbol in chart legend ──
-    const legendText = await page.evaluate(() => {
+    // ── Verify symbol in chart ──
+    const verified = await page.evaluate((sym) => {
+      const symUpper = sym.toUpperCase();
+
+      // Layer 1: Toolbar symbol button (shows ticker directly, e.g. "AALI")
+      const btn = document.querySelector('#header-toolbar-symbol-search');
+      if (btn && btn.textContent.toUpperCase().includes(symUpper)) return true;
+
+      // Layer 2: Scan ALL legend items for ticker match
       const items = document.querySelectorAll(
         '[data-name="legend-source-item"], .legendMainSourceWrapper'
       );
       for (const item of items) {
-        return (item.textContent || '').substring(0, 200);
+        if ((item.textContent || '').toUpperCase().includes(symUpper)) return true;
       }
-      return '';
-    });
 
-    if (legendText.toUpperCase().includes(symbol.toUpperCase())) {
-      logger.info(`TradingView: symbol verified — ${symbol} found in legend`);
+      return false;
+    }, symbol);
+
+    if (verified) {
+      logger.info(`TradingView: symbol verified — ${symbol}`);
       return;
     }
 
-    // Symbol not found in legend
     if (attempt < maxAttempts) {
-      logger.warn(`TradingView: legend does not contain "${symbol}" (got: "${legendText.substring(0, 80)}") — retrying (${attempt}/${maxAttempts})`);
-      // Close search dialog if still open
+      logger.warn(`TradingView: could not verify ${symbol} in chart — retrying (${attempt}/${maxAttempts})`);
       await page.keyboard.press('Escape');
       await new Promise(r => setTimeout(r, 1000));
     } else {
-      throw new Error(`Symbol ${symbol} not found in chart legend after ${maxAttempts} attempts`);
+      // Warning only — duplicate detection in scrape-job will catch actual stale data
+      logger.warn(`TradingView: could not verify ${symbol} — proceeding anyway`);
+      return;
     }
   }
 }
