@@ -289,7 +289,11 @@ els.btnScrapeAll.addEventListener('click', () => {
 els.btnCancelScrape.addEventListener('click', async () => {
   try {
     els.btnCancelScrape.disabled = true;
-    const res = await fetch('/api/scrape/cancel', { method: 'POST' });
+    const res = await fetch('/api/scrape/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
     const data = await res.json();
     if (!res.ok) {
       addLogEntry(`Cancel failed: ${data.error}`, 'error');

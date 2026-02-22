@@ -108,6 +108,16 @@ app.get('/api/prices', async (req, res) => {
   }
 });
 
+// ── POST /api/scrape/cancel ────────────────────────────────────────
+
+app.post('/api/scrape/cancel', (req, res) => {
+  if (!scrapeJob.isRunning()) {
+    return res.status(400).json({ error: 'No scrape job running' });
+  }
+  scrapeJob.abort();
+  res.json({ message: 'Scrape job cancellation requested' });
+});
+
 // ── POST /api/scrape ────────────────────────────────────────────────
 
 app.post('/api/scrape', async (req, res) => {
@@ -158,16 +168,6 @@ app.post('/api/scrape', async (req, res) => {
     logger.error(`POST /api/scrape: ${err.message}`);
     res.status(500).json({ error: err.message });
   }
-});
-
-// ── POST /api/scrape/cancel ────────────────────────────────────────
-
-app.post('/api/scrape/cancel', (req, res) => {
-  if (!scrapeJob.isRunning()) {
-    return res.status(400).json({ error: 'No scrape job running' });
-  }
-  scrapeJob.abort();
-  res.json({ message: 'Scrape job cancellation requested' });
 });
 
 // ── GET /api/scrape/status ──────────────────────────────────────────

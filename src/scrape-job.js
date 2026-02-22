@@ -81,7 +81,7 @@ export class ScrapeJob extends EventEmitter {
       const headed = process.env.NODE_ENV !== 'production';
       browser = await launchBrowser({ headed });
       this._browser = browser;
-      const page = await browser.newPage();
+      let page = await browser.newPage();
 
       this.emit('status', {
         state: 'running',
@@ -90,11 +90,12 @@ export class ScrapeJob extends EventEmitter {
         total: this.total,
       });
 
+      // Prepare credentials before the loop so they're available for re-auth
+      const tvCredentials = this.source === 'tradingview' ? getTradingViewCredentials() : null;
+      const credentials = this.source !== 'tradingview' ? getStockbitCredentials() : null;
+
       // ── Source-specific initialization ──
       if (this.source === 'tradingview') {
-        // TradingView: authenticate + navigate to chart
-        const tvCredentials = getTradingViewCredentials();
-
         this.emit('status', {
           state: 'running',
           message: 'Authenticating to TradingView...',
@@ -105,10 +106,8 @@ export class ScrapeJob extends EventEmitter {
         await ensureLoggedInTV(page, tvCredentials, config.baseUrl);
         await ensureDaily(page);
       } else {
-        // Stockbit: authenticate via cookies + login form
         const firstSymbolUrl = config.baseUrl.replace('{symbol}', this.symbols[0])
           + (config.pageVariant ? `/${config.pageVariant}` : '');
-        const credentials = getStockbitCredentials();
 
         this.emit('status', {
           state: 'running',
@@ -178,6 +177,42 @@ export class ScrapeJob extends EventEmitter {
             completed: this.completed + 1, total: this.total,
           });
           logger.error(`${symbol}: ${err.message}`);
+
+          // After protocol/timeout errors the page may be in a broken state.
+          if (err.message.includes('timed out') || err.message.includes('Protocol') || err.message.includes('detached')) {
+            // If browser disconnected entirely, relaunch and re-authenticate
+            if (!browser.connected) {
+              logger.warn('Browser disconnected — relaunching...');
+              try {
+                browser = await launchBrowser({ headed });
+                this._browser = browser;
+                page = await browser.newPage();
+                if (this.source === 'tradingview') {
+                  await ensureLoggedInTV(page, tvCredentials, config.baseUrl);
+                  await ensureDaily(page);
+                } else {
+                  const nextSymbol = this.symbols[i + 1] || symbol;
+                  const reAuthUrl = config.baseUrl.replace('{symbol}', nextSymbol)
+                    + (config.pageVariant ? `/${config.pageVariant}` : '');
+                  await ensureLoggedIn(page, credentials, reAuthUrl);
+                }
+              } catch (relaunchErr) {
+                logger.error(`Failed to relaunch browser: ${relaunchErr.message}`);
+              }
+            } else {
+              // Browser still alive — just reset the page
+              try {
+                await page.goto('about:blank', { timeout: 10000 });
+                await new Promise(r => setTimeout(r, 1000));
+                if (this.source === 'tradingview') {
+                  await page.goto(config.baseUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+                  await new Promise(r => setTimeout(r, 3000));
+                }
+              } catch {
+                logger.warn('Failed to reset page after timeout — continuing anyway');
+              }
+            }
+          }
         }
 
         this.completed++;

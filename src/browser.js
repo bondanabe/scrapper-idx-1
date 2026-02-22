@@ -19,7 +19,7 @@ export async function launchBrowser(options = {}) {
       '--window-size=1400,900',
     ],
     defaultViewport: { width: 1400, height: 900 },
-    protocolTimeout: 300_000,  // 5 min — prevent auto-close during OTP input
+    protocolTimeout: 0,  // unlimited — browser only closes when we call browser.close()
   });
 
   // Set default timeouts on all new pages (wrapped in try/catch to avoid
