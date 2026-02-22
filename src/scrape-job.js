@@ -9,6 +9,15 @@ import { ensureDaily, changeSymbolTV, ensureLoggedInTV } from './tradingview.js'
 import { getTradingViewCredentials } from './config.js';
 import { logger } from './logger.js';
 
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms)
+    ),
+  ]);
+}
+
 export class ScrapeJob extends EventEmitter {
   constructor() {
     super();
@@ -159,36 +168,38 @@ export class ScrapeJob extends EventEmitter {
         });
 
         try {
-          // ── Navigate to symbol ──
-          if (this.source === 'tradingview') {
-            await changeSymbolTV(page, symbol, config['chart-header'] || {});
-          } else if (page.url().includes(`/symbol/${symbol.toUpperCase()}`)) {
-            await executePreActions(page, config.preActions || []);
-          } else {
-            await navigateToSymbol(page, config, symbol);
-          }
-
-          // ── Extract data ──
-          const rows = await extractData(page, config, symbol);
-          if (rows.length === 0) {
-            this.failed.push(symbol);
-            this._addLog(`${symbol}: FAILED - No data extracted`, 'error');
-            this.emit('symbol-error', {
-              symbol, error: 'No data extracted',
-              completed: this.completed + 1, total: this.total,
-            });
-          } else {
-            const { inserted, errors } = await upsertRows(rows, config.dateFormat, config.dateMode, config.numberLocale, this.customDate);
-            this.totalInserted += inserted;
-            this._addLog(`${symbol}: ${inserted} row(s) saved`, 'success');
-            this.emit('symbol-done', {
-              symbol, rows: inserted,
-              completed: this.completed + 1, total: this.total,
-            });
-            if (errors.length > 0) {
-              logger.warn(`${symbol}: ${errors.length} batch errors during upsert`);
+          await withTimeout((async () => {
+            // ── Navigate to symbol ──
+            if (this.source === 'tradingview') {
+              await changeSymbolTV(page, symbol, config['chart-header'] || {});
+            } else if (page.url().includes(`/symbol/${symbol.toUpperCase()}`)) {
+              await executePreActions(page, config.preActions || []);
+            } else {
+              await navigateToSymbol(page, config, symbol);
             }
-          }
+
+            // ── Extract data ──
+            const rows = await extractData(page, config, symbol);
+            if (rows.length === 0) {
+              this.failed.push(symbol);
+              this._addLog(`${symbol}: FAILED - No data extracted`, 'error');
+              this.emit('symbol-error', {
+                symbol, error: 'No data extracted',
+                completed: this.completed + 1, total: this.total,
+              });
+            } else {
+              const { inserted, errors } = await upsertRows(rows, config.dateFormat, config.dateMode, config.numberLocale, this.customDate);
+              this.totalInserted += inserted;
+              this._addLog(`${symbol}: ${inserted} row(s) saved`, 'success');
+              this.emit('symbol-done', {
+                symbol, rows: inserted,
+                completed: this.completed + 1, total: this.total,
+              });
+              if (errors.length > 0) {
+                logger.warn(`${symbol}: ${errors.length} batch errors during upsert`);
+              }
+            }
+          })(), 60_000, symbol);
         } catch (err) {
           this.failed.push(symbol);
           this._addLog(`${symbol}: FAILED - ${err.message}`, 'error');
