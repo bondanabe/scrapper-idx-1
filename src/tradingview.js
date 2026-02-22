@@ -375,84 +375,95 @@ export async function ensureDaily(page) {
  */
 export async function changeSymbolTV(page, symbol, config = {}) {
   const waitAfter = config.waitAfterSymbolChange || 3000;
+  const maxAttempts = 2;
 
   logger.info(`TradingView: changing symbol to ${symbol}...`);
 
-  // Click the symbol search button (top-left of toolbar)
-  const searchOpened = await page.evaluate(() => {
-    // Method 1: Click the symbol search button by ID
-    const searchBtn = document.querySelector('#header-toolbar-symbol-search');
-    if (searchBtn) {
-      searchBtn.click();
-      return true;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    // Click the symbol search button (top-left of toolbar)
+    const searchOpened = await page.evaluate(() => {
+      const searchBtn = document.querySelector('#header-toolbar-symbol-search');
+      if (searchBtn) { searchBtn.click(); return true; }
+      const symbolEl = document.querySelector('[data-name="symbol-search"] button, .tv-symbol-header__symbol');
+      if (symbolEl) { symbolEl.click(); return true; }
+      return false;
+    });
+
+    if (!searchOpened) {
+      logger.warn('TradingView: could not find symbol search button, trying keyboard shortcut');
     }
 
-    // Method 2: Click the symbol name text area
-    const symbolEl = document.querySelector('[data-name="symbol-search"] button, .tv-symbol-header__symbol');
-    if (symbolEl) {
-      symbolEl.click();
-      return true;
-    }
+    await new Promise(r => setTimeout(r, 1000));
 
-    return false;
-  });
+    // Clear existing text and type the new symbol
+    await page.keyboard.down('Control');
+    await page.keyboard.press('a');
+    await page.keyboard.up('Control');
+    await page.keyboard.type(symbol, { delay: 80 });
 
-  if (!searchOpened) {
-    logger.warn('TradingView: could not find symbol search button, trying keyboard shortcut');
-  }
+    await new Promise(r => setTimeout(r, 2000));
 
-  // Wait for search dialog to open
-  await new Promise(r => setTimeout(r, 1000));
+    // Click the first IDX result (or first result if no IDX match)
+    const selected = await page.evaluate((sym) => {
+      const selectors = [
+        '[data-name="symbol-search-items-dialog"] [class*="itemRow"]',
+        '.tv-search-dialog__results .tv-search-dialog__item',
+        '[class*="listContainer"] [class*="symbolRow"]',
+        '[class*="itemRow"]',
+      ];
 
-  // Clear existing text and type the new symbol
-  await page.keyboard.down('Control');
-  await page.keyboard.press('a');
-  await page.keyboard.up('Control');
-  await page.keyboard.type(symbol, { delay: 80 });
+      for (const sel of selectors) {
+        const items = document.querySelectorAll(sel);
+        if (items.length === 0) continue;
 
-  // Wait for search results to appear
-  await new Promise(r => setTimeout(r, 2000));
-
-  // Click the first IDX result (or first result if no IDX match)
-  const selected = await page.evaluate((sym) => {
-    // Look for search result items
-    const selectors = [
-      '[data-name="symbol-search-items-dialog"] [class*="itemRow"]',
-      '.tv-search-dialog__results .tv-search-dialog__item',
-      '[class*="listContainer"] [class*="symbolRow"]',
-      '[class*="itemRow"]',
-    ];
-
-    for (const sel of selectors) {
-      const items = document.querySelectorAll(sel);
-      if (items.length === 0) continue;
-
-      // Prefer IDX exchange match
-      for (const item of items) {
-        const text = item.textContent.toLowerCase();
-        if (text.includes('idx') && text.includes(sym.toLowerCase())) {
-          item.click();
-          return `IDX: ${sym}`;
+        for (const item of items) {
+          const text = item.textContent.toLowerCase();
+          if (text.includes('idx') && text.includes(sym.toLowerCase())) {
+            item.click();
+            return `IDX: ${sym}`;
+          }
         }
-      }
 
-      // Fallback: click first result
-      items[0].click();
-      return `first result for ${sym}`;
+        items[0].click();
+        return `first result for ${sym}`;
+      }
+      return null;
+    }, symbol);
+
+    if (selected) {
+      logger.debug(`TradingView: selected "${selected}"`);
+    } else {
+      logger.debug('TradingView: no result clicked, pressing Enter');
+      await page.keyboard.press('Enter');
     }
 
-    return null;
-  }, symbol);
+    // Wait for chart to load the new symbol
+    await new Promise(r => setTimeout(r, waitAfter));
 
-  if (selected) {
-    logger.debug(`TradingView: selected "${selected}"`);
-  } else {
-    // Fallback: press Enter to select first result
-    logger.debug('TradingView: no result clicked, pressing Enter');
-    await page.keyboard.press('Enter');
+    // ── Verify symbol in chart legend ──
+    const legendText = await page.evaluate(() => {
+      const items = document.querySelectorAll(
+        '[data-name="legend-source-item"], .legendMainSourceWrapper'
+      );
+      for (const item of items) {
+        return (item.textContent || '').substring(0, 200);
+      }
+      return '';
+    });
+
+    if (legendText.toUpperCase().includes(symbol.toUpperCase())) {
+      logger.info(`TradingView: symbol verified — ${symbol} found in legend`);
+      return;
+    }
+
+    // Symbol not found in legend
+    if (attempt < maxAttempts) {
+      logger.warn(`TradingView: legend does not contain "${symbol}" (got: "${legendText.substring(0, 80)}") — retrying (${attempt}/${maxAttempts})`);
+      // Close search dialog if still open
+      await page.keyboard.press('Escape');
+      await new Promise(r => setTimeout(r, 1000));
+    } else {
+      throw new Error(`Symbol ${symbol} not found in chart legend after ${maxAttempts} attempts`);
+    }
   }
-
-  // Wait for chart to load the new symbol
-  await new Promise(r => setTimeout(r, waitAfter));
-  logger.info(`TradingView: symbol changed to ${symbol}`);
 }

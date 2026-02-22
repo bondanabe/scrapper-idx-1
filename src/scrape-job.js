@@ -33,6 +33,7 @@ export class ScrapeJob extends EventEmitter {
     this._aborted = false;
     this._browser = null;
     this._logs = [];
+    this._lastOHLCV = null;
   }
 
   isRunning() {
@@ -84,6 +85,7 @@ export class ScrapeJob extends EventEmitter {
     this.totalInserted = 0;
     this._startTime = Date.now();
     this._logs = [];
+    this._lastOHLCV = null;
 
     // Run async — don't block the HTTP response
     this._run().catch(err => {
@@ -170,16 +172,55 @@ export class ScrapeJob extends EventEmitter {
         try {
           await withTimeout((async () => {
             // ── Navigate to symbol ──
+            const symbolUrl = config.baseUrl.replace('{symbol}', symbol.toUpperCase())
+              + (config.pageVariant ? `/${config.pageVariant}` : '');
+
             if (this.source === 'tradingview') {
               await changeSymbolTV(page, symbol, config['chart-header'] || {});
-            } else if (page.url().includes(`/symbol/${symbol.toUpperCase()}`)) {
-              await executePreActions(page, config.preActions || []);
             } else {
               await navigateToSymbol(page, config, symbol);
+              // Verify URL contains the correct symbol
+              const currentUrl = page.url();
+              if (!currentUrl.includes(`/symbol/${symbol.toUpperCase()}`)) {
+                logger.warn(`${symbol}: URL mismatch (${currentUrl}) — retrying navigation`);
+                await page.goto(symbolUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+                await executePreActions(page, config.preActions || []);
+              }
             }
 
             // ── Extract data ──
-            const rows = await extractData(page, config, symbol);
+            let rows = await extractData(page, config, symbol);
+
+            // ── Duplicate detection — stale page guard ──
+            if (rows.length > 0 && this._lastOHLCV) {
+              const r = rows[0];
+              const key = `${r.open}|${r.high}|${r.low}|${r.close}|${r.volume}`;
+              if (key === this._lastOHLCV) {
+                logger.warn(`${symbol}: data identical to previous symbol — retrying with hard reload`);
+                this._addLog(`${symbol}: stale data detected, retrying...`, 'warn');
+                // Force hard reload
+                await page.goto(symbolUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+                await new Promise(r => setTimeout(r, 5000));
+                if (config.preActions) await executePreActions(page, config.preActions);
+                rows = await extractData(page, config, symbol);
+
+                // Check again after retry
+                if (rows.length > 0) {
+                  const r2 = rows[0];
+                  const key2 = `${r2.open}|${r2.high}|${r2.low}|${r2.close}|${r2.volume}`;
+                  if (key2 === this._lastOHLCV) {
+                    this.failed.push(symbol);
+                    this._addLog(`${symbol}: FAILED - Stale data after retry`, 'error');
+                    this.emit('symbol-error', {
+                      symbol, error: 'Stale data (identical to previous symbol)',
+                      completed: this.completed + 1, total: this.total,
+                    });
+                    return; // skip upsert
+                  }
+                }
+              }
+            }
+
             if (rows.length === 0) {
               this.failed.push(symbol);
               this._addLog(`${symbol}: FAILED - No data extracted`, 'error');
@@ -188,6 +229,10 @@ export class ScrapeJob extends EventEmitter {
                 completed: this.completed + 1, total: this.total,
               });
             } else {
+              // Update last OHLCV fingerprint
+              const r = rows[0];
+              this._lastOHLCV = `${r.open}|${r.high}|${r.low}|${r.close}|${r.volume}`;
+
               const { inserted, errors } = await upsertRows(rows, config.dateFormat, config.dateMode, config.numberLocale, this.customDate);
               this.totalInserted += inserted;
               this._addLog(`${symbol}: ${inserted} row(s) saved`, 'success');
