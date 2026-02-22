@@ -176,6 +176,12 @@ app.get('/api/scrape/status', (req, res) => {
   res.json(scrapeJob.getStatus());
 });
 
+// ── GET /api/scrape/logs ────────────────────────────────────────────
+
+app.get('/api/scrape/logs', (req, res) => {
+  res.json({ logs: scrapeJob.getLogs() });
+});
+
 // ── GET /api/scrape/progress (SSE) ──────────────────────────────────
 
 app.get('/api/scrape/progress', (req, res) => {
@@ -185,7 +191,11 @@ app.get('/api/scrape/progress', (req, res) => {
     'Connection': 'keep-alive',
   });
 
-  // Send current status immediately
+  // Send log history + current status immediately
+  const logs = scrapeJob.getLogs();
+  if (logs.length > 0) {
+    res.write(`event: log-history\ndata: ${JSON.stringify(logs)}\n\n`);
+  }
   const status = scrapeJob.getStatus();
   res.write(`event: status\ndata: ${JSON.stringify(status)}\n\n`);
 

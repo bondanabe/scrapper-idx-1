@@ -305,12 +305,12 @@ els.btnCancelScrape.addEventListener('click', async () => {
   }
 });
 
-function addLogEntry(message, level = '') {
-  const now = new Date();
-  const ts = now.toLocaleTimeString('en-GB');
+function addLogEntry(message, level = '', ts = null) {
+  const date = ts ? new Date(ts) : new Date();
+  const timeStr = date.toLocaleTimeString('en-GB');
   const entry = document.createElement('div');
   entry.className = `log-entry ${level}`;
-  entry.innerHTML = `<span class="timestamp">[${ts}]</span> ${escapeHtml(message)}`;
+  entry.innerHTML = `<span class="timestamp">[${timeStr}]</span> ${escapeHtml(message)}`;
   els.scrapeLog.appendChild(entry);
   els.scrapeLog.parentElement.scrollTop = els.scrapeLog.parentElement.scrollHeight;
 }
@@ -332,13 +332,41 @@ function updateScrapeUI(data) {
 
 // ── SSE ──────────────────────────────────────────────────────────────
 
+let _sseSource = null;
+let _sseRetryTimer = null;
+let _historyLoaded = false;
+
 function connectSSE() {
+  // Clean up previous connection
+  if (_sseSource) {
+    _sseSource.close();
+    _sseSource = null;
+  }
+  if (_sseRetryTimer) {
+    clearTimeout(_sseRetryTimer);
+    _sseRetryTimer = null;
+  }
+
   const source = new EventSource('/api/scrape/progress');
+  _sseSource = source;
+
+  // Load log history from server (sent on connect)
+  source.addEventListener('log-history', (e) => {
+    const logs = JSON.parse(e.data);
+    els.scrapeLog.innerHTML = '';
+    logs.forEach(entry => addLogEntry(entry.message, entry.level, entry.ts));
+    _historyLoaded = true;
+  });
 
   source.addEventListener('status', (e) => {
     const data = JSON.parse(e.data);
     state.scrapeState = data.state;
     updateScrapeUI(data);
+    // Mark ready for live logs after first status (handles case when no history exists)
+    if (!_historyLoaded) {
+      _historyLoaded = true;
+      return;
+    }
     if (data.message && data.state === 'running') {
       addLogEntry(data.message);
     }
@@ -347,13 +375,17 @@ function connectSSE() {
   source.addEventListener('symbol-done', (e) => {
     const data = JSON.parse(e.data);
     updateScrapeUI(data);
-    addLogEntry(`${data.symbol}: ${data.rows} row(s) saved`, 'success');
+    if (_historyLoaded) {
+      addLogEntry(`${data.symbol}: ${data.rows} row(s) saved`, 'success');
+    }
   });
 
   source.addEventListener('symbol-error', (e) => {
     const data = JSON.parse(e.data);
     updateScrapeUI(data);
-    addLogEntry(`${data.symbol}: FAILED - ${data.error}`, 'error');
+    if (_historyLoaded) {
+      addLogEntry(`${data.symbol}: FAILED - ${data.error}`, 'error');
+    }
   });
 
   source.addEventListener('done', (e) => {
@@ -363,7 +395,9 @@ function connectSSE() {
     els.btnCancelScrape.style.display = 'none';
     const secs = (data.elapsed / 1000).toFixed(1);
     const failedMsg = data.failed.length > 0 ? ` | Failed: ${data.failed.join(', ')}` : '';
-    addLogEntry(`Done in ${secs}s. ${data.totalInserted} rows saved.${failedMsg}`, 'success');
+    if (_historyLoaded) {
+      addLogEntry(`Done in ${secs}s. ${data.totalInserted} rows saved.${failedMsg}`, 'success');
+    }
 
     els.progressBar.style.width = '100%';
     els.progressText.textContent = `${state.scrapeProgress.total} / ${state.scrapeProgress.total} (100%)`;
@@ -375,7 +409,9 @@ function connectSSE() {
     els.scrapeState.textContent = 'Cancelled';
     els.btnCancelScrape.style.display = 'none';
     const secs = (data.elapsed / 1000).toFixed(1);
-    addLogEntry(`Cancelled after ${secs}s. ${data.completed}/${data.total} symbols done, ${data.totalInserted} rows saved.`, 'warning');
+    if (_historyLoaded) {
+      addLogEntry(`Cancelled after ${secs}s. ${data.completed}/${data.total} symbols done, ${data.totalInserted} rows saved.`, 'warning');
+    }
   });
 
   source.addEventListener('error', (e) => {
@@ -384,12 +420,25 @@ function connectSSE() {
       state.scrapeState = 'error';
       els.scrapeState.textContent = 'Error';
       els.btnCancelScrape.style.display = 'none';
-      addLogEntry(`ERROR: ${data.message}`, 'error');
+      if (_historyLoaded) {
+        addLogEntry(`ERROR: ${data.message}`, 'error');
+      }
     } catch {
-      // SSE connection error — browser will auto-reconnect
+      // SSE connection lost — retry after 3s
+      source.close();
+      _sseSource = null;
+      _sseRetryTimer = setTimeout(connectSSE, 3000);
     }
   });
 }
+
+// Reconnect when tab becomes visible (after laptop sleep or tab switch)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    _historyLoaded = false;
+    connectSSE();
+  }
+});
 
 // ── Data Viewer ──────────────────────────────────────────────────────
 

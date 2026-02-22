@@ -23,6 +23,7 @@ export class ScrapeJob extends EventEmitter {
     this._startTime = null;
     this._aborted = false;
     this._browser = null;
+    this._logs = [];
   }
 
   isRunning() {
@@ -39,6 +40,15 @@ export class ScrapeJob extends EventEmitter {
       totalInserted: this.totalInserted,
       lastRun: this.lastRun,
     };
+  }
+
+  _addLog(message, level = '') {
+    this._logs.push({ ts: new Date().toISOString(), message, level });
+    if (this._logs.length > 500) this._logs.shift();
+  }
+
+  getLogs() {
+    return [...this._logs];
   }
 
   abort() {
@@ -64,11 +74,13 @@ export class ScrapeJob extends EventEmitter {
     this.failed = [];
     this.totalInserted = 0;
     this._startTime = Date.now();
+    this._logs = [];
 
     // Run async — don't block the HTTP response
     this._run().catch(err => {
       this.state = 'error';
       this.currentSymbol = null;
+      this._addLog(`Job crashed: ${err.message}`, 'error');
       this.emit('error', { state: 'error', message: err.message });
       logger.error(`Scrape job crashed: ${err.message}`);
     });
@@ -83,6 +95,7 @@ export class ScrapeJob extends EventEmitter {
       this._browser = browser;
       let page = await browser.newPage();
 
+      this._addLog(`Initializing (${this.source})...`);
       this.emit('status', {
         state: 'running',
         message: `Initializing (${this.source})...`,
@@ -96,6 +109,7 @@ export class ScrapeJob extends EventEmitter {
 
       // ── Source-specific initialization ──
       if (this.source === 'tradingview') {
+        this._addLog('Authenticating to TradingView...');
         this.emit('status', {
           state: 'running',
           message: 'Authenticating to TradingView...',
@@ -109,6 +123,7 @@ export class ScrapeJob extends EventEmitter {
         const firstSymbolUrl = config.baseUrl.replace('{symbol}', this.symbols[0])
           + (config.pageVariant ? `/${config.pageVariant}` : '');
 
+        this._addLog('Authenticating...');
         this.emit('status', {
           state: 'running',
           message: 'Authenticating...',
@@ -119,6 +134,7 @@ export class ScrapeJob extends EventEmitter {
         await ensureLoggedIn(page, credentials, firstSymbolUrl);
       }
 
+      this._addLog('Ready, starting scrape...');
       this.emit('status', {
         state: 'running',
         message: 'Ready, starting scrape...',
@@ -133,6 +149,7 @@ export class ScrapeJob extends EventEmitter {
         const symbol = this.symbols[i];
         this.currentSymbol = symbol;
 
+        this._addLog(`Processing ${symbol}... (${i + 1}/${this.total})`);
         this.emit('status', {
           state: 'running',
           currentSymbol: symbol,
@@ -155,6 +172,7 @@ export class ScrapeJob extends EventEmitter {
           const rows = await extractData(page, config, symbol);
           if (rows.length === 0) {
             this.failed.push(symbol);
+            this._addLog(`${symbol}: FAILED - No data extracted`, 'error');
             this.emit('symbol-error', {
               symbol, error: 'No data extracted',
               completed: this.completed + 1, total: this.total,
@@ -162,6 +180,7 @@ export class ScrapeJob extends EventEmitter {
           } else {
             const { inserted, errors } = await upsertRows(rows, config.dateFormat, config.dateMode, config.numberLocale, this.customDate);
             this.totalInserted += inserted;
+            this._addLog(`${symbol}: ${inserted} row(s) saved`, 'success');
             this.emit('symbol-done', {
               symbol, rows: inserted,
               completed: this.completed + 1, total: this.total,
@@ -172,6 +191,7 @@ export class ScrapeJob extends EventEmitter {
           }
         } catch (err) {
           this.failed.push(symbol);
+          this._addLog(`${symbol}: FAILED - ${err.message}`, 'error');
           this.emit('symbol-error', {
             symbol, error: err.message,
             completed: this.completed + 1, total: this.total,
@@ -233,6 +253,7 @@ export class ScrapeJob extends EventEmitter {
 
       if (this._aborted) {
         this.state = 'idle';
+        this._addLog(`Cancelled after ${this.completed}/${this.total} symbols (${Math.round(elapsed / 1000)}s)`, 'warn');
         this.emit('cancelled', {
           state: 'idle',
           message: `Cancelled after ${this.completed}/${this.total} symbols`,
@@ -244,6 +265,7 @@ export class ScrapeJob extends EventEmitter {
         logger.info(`Scrape job cancelled (${this.completed}/${this.total} done)`);
       } else {
         this.state = 'idle';
+        this._addLog(`Completed: ${this.totalInserted} rows inserted, ${this.failed.length} failed (${Math.round(elapsed / 1000)}s)`, 'success');
         this.emit('done', {
           state: 'idle',
           totalInserted: this.totalInserted,
