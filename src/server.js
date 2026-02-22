@@ -160,6 +160,16 @@ app.post('/api/scrape', async (req, res) => {
   }
 });
 
+// ── POST /api/scrape/cancel ────────────────────────────────────────
+
+app.post('/api/scrape/cancel', (req, res) => {
+  if (!scrapeJob.isRunning()) {
+    return res.status(400).json({ error: 'No scrape job running' });
+  }
+  scrapeJob.abort();
+  res.json({ message: 'Scrape job cancellation requested' });
+});
+
 // ── GET /api/scrape/status ──────────────────────────────────────────
 
 app.get('/api/scrape/status', (req, res) => {
@@ -184,12 +194,14 @@ app.get('/api/scrape/progress', (req, res) => {
   const onSymbolError = (data) => res.write(`event: symbol-error\ndata: ${JSON.stringify(data)}\n\n`);
   const onDone = (data) => res.write(`event: done\ndata: ${JSON.stringify(data)}\n\n`);
   const onError = (data) => res.write(`event: error\ndata: ${JSON.stringify(data)}\n\n`);
+  const onCancelled = (data) => res.write(`event: cancelled\ndata: ${JSON.stringify(data)}\n\n`);
 
   scrapeJob.on('status', onStatus);
   scrapeJob.on('symbol-done', onSymbolDone);
   scrapeJob.on('symbol-error', onSymbolError);
   scrapeJob.on('done', onDone);
   scrapeJob.on('error', onError);
+  scrapeJob.on('cancelled', onCancelled);
 
   // Heartbeat every 30s
   const heartbeat = setInterval(() => {
@@ -203,6 +215,7 @@ app.get('/api/scrape/progress', (req, res) => {
     scrapeJob.off('symbol-error', onSymbolError);
     scrapeJob.off('done', onDone);
     scrapeJob.off('error', onError);
+    scrapeJob.off('cancelled', onCancelled);
   });
 });
 

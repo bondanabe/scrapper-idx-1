@@ -42,6 +42,7 @@ const els = {
   scrapeDate: $('#scrape-date'),
   btnScrapeSelected: $('#btn-scrape-selected'),
   btnScrapeAll: $('#btn-scrape-all'),
+  btnCancelScrape: $('#btn-cancel-scrape'),
   scrapeState: $('#scrape-state'),
   scrapeSummary: $('#scrape-summary'),
   progressBar: $('#progress-bar'),
@@ -285,6 +286,21 @@ els.btnScrapeAll.addEventListener('click', () => {
   startScrape(['*']);
 });
 
+els.btnCancelScrape.addEventListener('click', async () => {
+  try {
+    els.btnCancelScrape.disabled = true;
+    const res = await fetch('/api/scrape/cancel', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) {
+      addLogEntry(`Cancel failed: ${data.error}`, 'error');
+    }
+  } catch (err) {
+    addLogEntry(`Cancel error: ${err.message}`, 'error');
+  } finally {
+    els.btnCancelScrape.disabled = false;
+  }
+});
+
 function addLogEntry(message, level = '') {
   const now = new Date();
   const ts = now.toLocaleTimeString('en-GB');
@@ -297,6 +313,10 @@ function addLogEntry(message, level = '') {
 
 function updateScrapeUI(data) {
   els.scrapeState.textContent = capitalize(data.state || state.scrapeState);
+
+  // Toggle cancel button visibility
+  const isRunning = (data.state || state.scrapeState) === 'running';
+  els.btnCancelScrape.style.display = isRunning ? 'inline-block' : 'none';
 
   if (data.completed !== undefined && data.total) {
     const pct = Math.round((data.completed / data.total) * 100);
@@ -336,6 +356,7 @@ function connectSSE() {
     const data = JSON.parse(e.data);
     state.scrapeState = 'idle';
     els.scrapeState.textContent = 'Completed';
+    els.btnCancelScrape.style.display = 'none';
     const secs = (data.elapsed / 1000).toFixed(1);
     const failedMsg = data.failed.length > 0 ? ` | Failed: ${data.failed.join(', ')}` : '';
     addLogEntry(`Done in ${secs}s. ${data.totalInserted} rows saved.${failedMsg}`, 'success');
@@ -344,11 +365,21 @@ function connectSSE() {
     els.progressText.textContent = `${state.scrapeProgress.total} / ${state.scrapeProgress.total} (100%)`;
   });
 
+  source.addEventListener('cancelled', (e) => {
+    const data = JSON.parse(e.data);
+    state.scrapeState = 'idle';
+    els.scrapeState.textContent = 'Cancelled';
+    els.btnCancelScrape.style.display = 'none';
+    const secs = (data.elapsed / 1000).toFixed(1);
+    addLogEntry(`Cancelled after ${secs}s. ${data.completed}/${data.total} symbols done, ${data.totalInserted} rows saved.`, 'warning');
+  });
+
   source.addEventListener('error', (e) => {
     try {
       const data = JSON.parse(e.data);
       state.scrapeState = 'error';
       els.scrapeState.textContent = 'Error';
+      els.btnCancelScrape.style.display = 'none';
       addLogEntry(`ERROR: ${data.message}`, 'error');
     } catch {
       // SSE connection error — browser will auto-reconnect

@@ -21,6 +21,8 @@ export class ScrapeJob extends EventEmitter {
     this.totalInserted = 0;
     this.lastRun = null;
     this._startTime = null;
+    this._aborted = false;
+    this._browser = null;
   }
 
   isRunning() {
@@ -39,9 +41,19 @@ export class ScrapeJob extends EventEmitter {
     };
   }
 
+  abort() {
+    if (this.state !== 'running') return;
+    this._aborted = true;
+    logger.info('Scrape job abort requested');
+    if (this._browser) {
+      this._browser.close().catch(() => {});
+    }
+  }
+
   async start(symbols, customDate, source = 'stockbit') {
     if (this.isRunning()) throw new Error('Job already running');
 
+    this._aborted = false;
     this.state = 'running';
     this.symbols = symbols;
     this.customDate = customDate || null;
@@ -68,6 +80,7 @@ export class ScrapeJob extends EventEmitter {
       const config = await loadSelectors(this.source);
       const headed = process.env.NODE_ENV !== 'production';
       browser = await launchBrowser({ headed });
+      this._browser = browser;
       const page = await browser.newPage();
 
       this.emit('status', {
@@ -116,6 +129,8 @@ export class ScrapeJob extends EventEmitter {
 
       // ── Symbol loop ──
       for (let i = 0; i < this.symbols.length; i++) {
+        if (this._aborted) break;
+
         const symbol = this.symbols[i];
         this.currentSymbol = symbol;
 
@@ -173,25 +188,40 @@ export class ScrapeJob extends EventEmitter {
         }
       }
 
-      await browser.close();
+      try { await browser.close(); } catch { /* ignore */ }
       browser = null;
+      this._browser = null;
 
-      this.state = 'idle';
       this.currentSymbol = null;
       this.lastRun = new Date().toISOString();
       const elapsed = Date.now() - this._startTime;
 
-      this.emit('done', {
-        state: 'idle',
-        totalInserted: this.totalInserted,
-        failed: [...this.failed],
-        elapsed,
-      });
+      if (this._aborted) {
+        this.state = 'idle';
+        this.emit('cancelled', {
+          state: 'idle',
+          message: `Cancelled after ${this.completed}/${this.total} symbols`,
+          completed: this.completed,
+          total: this.total,
+          totalInserted: this.totalInserted,
+          elapsed,
+        });
+        logger.info(`Scrape job cancelled (${this.completed}/${this.total} done)`);
+      } else {
+        this.state = 'idle';
+        this.emit('done', {
+          state: 'idle',
+          totalInserted: this.totalInserted,
+          failed: [...this.failed],
+          elapsed,
+        });
+      }
 
     } catch (err) {
       if (browser) {
         try { await browser.close(); } catch { /* ignore */ }
       }
+      this._browser = null;
       this.state = 'error';
       this.currentSymbol = null;
       throw err;

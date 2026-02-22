@@ -123,6 +123,13 @@ header h1 {
 .btn.primary:hover { background: var(--primary-hover); }
 .btn.primary:disabled { background: var(--primary); opacity: 0.5; }
 
+.btn.btn-danger {
+  background: var(--danger);
+  color: white;
+  border-color: var(--danger);
+}
+.btn.btn-danger:hover { background: #b91c1c; }
+
 /* ── Select bar ──────────────────────────────────────────── */
 
 .select-bar {
