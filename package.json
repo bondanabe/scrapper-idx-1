@@ -6,7 +6,11 @@
   "bin": {
     "scrapper-idx": "./src/index.js"
   },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
+    "start": "node src/server.js",
     "scrape": "node src/index.js scrape",
     "probe": "node src/index.js probe",
     "test-selectors": "node src/index.js test-selectors",

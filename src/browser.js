@@ -9,6 +9,7 @@ const USER_AGENT =
 export async function launchBrowser(options = {}) {
   const browser = await puppeteer.launch({
     headless: options.headed ? false : 'new',
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     slowMo: options.slowMo || 0,
     args: [
       '--no-sandbox',
