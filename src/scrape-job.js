@@ -215,13 +215,28 @@ export class ScrapeJob extends EventEmitter {
                   const r2 = rows[0];
                   const key2 = `${r2.open}|${r2.high}|${r2.low}|${r2.close}|${r2.volume}`;
                   if (key2 === this._lastOHLCV) {
-                    this.failed.push(symbol);
-                    this._addLog(`${symbol}: FAILED - Stale data after retry`, 'error');
-                    this.emit('symbol-error', {
-                      symbol, error: 'Stale data (identical to previous symbol)',
-                      completed: this.completed + 1, total: this.total,
-                    });
-                    return; // skip upsert
+                    // Data still identical — verify if chart shows correct symbol
+                    // Two illiquid stocks CAN have the same OHLCV legitimately
+                    let symbolVerified = false;
+                    if (this.source === 'tradingview') {
+                      symbolVerified = await page.evaluate((sym) => {
+                        const btn = document.querySelector('#header-toolbar-symbol-search');
+                        return btn && btn.textContent.toUpperCase().includes(sym.toUpperCase());
+                      }, symbol);
+                    }
+                    if (symbolVerified) {
+                      logger.info(`${symbol}: OHLCV same as previous but symbol verified — accepting data`);
+                      this._addLog(`${symbol}: same OHLCV as previous (legitimate)`, 'warn');
+                      // Fall through to upsert below
+                    } else {
+                      this.failed.push(symbol);
+                      this._addLog(`${symbol}: FAILED - Stale data after retry`, 'error');
+                      this.emit('symbol-error', {
+                        symbol, error: 'Stale data (identical to previous symbol)',
+                        completed: this.completed + 1, total: this.total,
+                      });
+                      return; // skip upsert
+                    }
                   }
                 }
               }
