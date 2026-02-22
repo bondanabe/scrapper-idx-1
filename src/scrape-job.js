@@ -66,7 +66,8 @@ export class ScrapeJob extends EventEmitter {
     let browser;
     try {
       const config = await loadSelectors(this.source);
-      browser = await launchBrowser({ headed: true });
+      const headed = process.env.NODE_ENV !== 'production';
+      browser = await launchBrowser({ headed });
       const page = await browser.newPage();
 
       this.emit('status', {
