@@ -196,12 +196,18 @@ export class ScrapeJob extends EventEmitter {
               const r = rows[0];
               const key = `${r.open}|${r.high}|${r.low}|${r.close}|${r.volume}`;
               if (key === this._lastOHLCV) {
-                logger.warn(`${symbol}: data identical to previous symbol — retrying with hard reload`);
+                logger.warn(`${symbol}: data identical to previous symbol — retrying`);
                 this._addLog(`${symbol}: stale data detected, retrying...`, 'warn');
-                // Force hard reload
-                await page.goto(symbolUrl, { waitUntil: 'networkidle2', timeout: 60000 });
-                await new Promise(r => setTimeout(r, 5000));
-                if (config.preActions) await executePreActions(page, config.preActions);
+
+                if (this.source === 'tradingview') {
+                  // Re-do symbol change via search dialog
+                  await changeSymbolTV(page, symbol, config['chart-header'] || {});
+                } else {
+                  // Stockbit: hard reload page
+                  await page.goto(symbolUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+                  await new Promise(r => setTimeout(r, 5000));
+                  if (config.preActions) await executePreActions(page, config.preActions);
+                }
                 rows = await extractData(page, config, symbol);
 
                 // Check again after retry
@@ -244,7 +250,7 @@ export class ScrapeJob extends EventEmitter {
                 logger.warn(`${symbol}: ${errors.length} batch errors during upsert`);
               }
             }
-          })(), 60_000, symbol);
+          })(), 90_000, symbol);
         } catch (err) {
           this.failed.push(symbol);
           this._addLog(`${symbol}: FAILED - ${err.message}`, 'error');
